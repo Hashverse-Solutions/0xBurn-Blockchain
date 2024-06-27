@@ -474,7 +474,7 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
             "ERC20: transfer amount exceeds balance"
         );
 
-        uint256 burnAmount = amount / 1000;
+        uint256 burnAmount = amount / 100;
         uint256 transferAmount = amount - burnAmount;
 
         _burn(from, burnAmount);

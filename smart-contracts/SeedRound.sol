@@ -1,4 +1,3 @@
-// File: contracts/utils/SafeMath.sol
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
@@ -42,8 +41,9 @@ contract SeedRound {
     uint256 public minimumAmount;
     address payable payableRecipient;
     address public xrcToken;
+    address public owner;
 
-    event Buy(address indexed beneficiary, uint256 indexed amountInvested, string indexed token);
+    event Buy(address indexed beneficiary, uint256 indexed amountInvested,uint256 _receive0xBurn,string indexed token);
 
     constructor(
         uint256 _minimumAmount,
@@ -67,7 +67,8 @@ contract SeedRound {
     /// @return bool This parameter indicates wether transaction was successfull/un-successfull
     function buyUsingUSDT(
         address _to,
-        uint256 _tokenAmount
+        uint256 _tokenAmount,
+        uint256 _receive0xBurn
     ) public payable returns (bool) {
         require(_tokenAmount >= minimumAmount, "SeedRound: minimum 1000 USDT or equivalent Arbitrum investment is required to participate in seed round");
 
@@ -77,7 +78,7 @@ contract SeedRound {
             _tokenAmount
         );
 
-        emit Buy(_to, _tokenAmount, "USDT");
+        emit Buy(_to, _tokenAmount, _receive0xBurn, "USDT");
         return true;
     }
 
@@ -85,12 +86,21 @@ contract SeedRound {
     /// @param _to This parameter indicates address which will receive OxBurn tokens
     /// @return bool This parameter indicates wether transaction was successfull/un-successfull
     function buyUsingArbitrum(
-        address _to
+        address _to,
+        uint256 _receive0xBurn
     ) public payable returns (bool) {
         // require(msg.value >= minimumAmount, "SeedRound: minimum 1000 USDT or equivalent Arbitrum investment is required to participate in seed round");
 
         payableRecipient.transfer(msg.value);
-        emit Buy(_to, msg.value, "Arbitrum");
+        emit Buy(_to, msg.value, _receive0xBurn, "Arbitrum");
         return true;
     }
+
+    function updatePayableRecipient(
+        address _payableRecipient
+    ) public {
+        require(msg.sender == owner,"only owner can change recipient");
+        payableRecipient = payable(_payableRecipient);        
+    }
+    
 }

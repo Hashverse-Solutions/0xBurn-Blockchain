@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "./IERC1155.sol";
 import "./IERC721.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver,ERC1155Holder {
+contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
     using SafeMath for uint256;
 
     /**
@@ -88,12 +86,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver,ERC1155Holder
             IERC721 erc721Token = IERC721(_tokenContract);
             require(erc721Token.ownerOf(_tokenId) == msg.sender, "You are not the owner of this token");
             IERC721(_tokenContract).safeTransferFrom(msg.sender, address(this), _tokenId);
-        } else if (keccak256(abi.encodePacked(_type)) == keccak256(abi.encodePacked("erc1155"))) {
-            // ERC1155
-            IERC1155 erc1155Token = IERC1155(_tokenContract);
-            require(erc1155Token.balanceOf(msg.sender,_tokenId) != 0, "You are not the owner of this token");
-            require(erc1155Token.balanceOf(msg.sender,_tokenId) >= _amount, "You have insufficient amount of tokens");
-            IERC1155(_tokenContract).safeTransferFrom(msg.sender, address(this), _tokenId, _amount, "");
         } else {
             revert("Unsupported token type");
         }
@@ -140,12 +132,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver,ERC1155Holder
             IERC721 erc721Token = IERC721(_tokenContract);
             require(erc721Token.ownerOf(_tokenId) == msg.sender, "You are not the owner of this token");
             IERC721(_tokenContract).safeTransferFrom(msg.sender, address(this), _tokenId);
-        } else if (keccak256(abi.encodePacked(_type)) == keccak256(abi.encodePacked("erc1155"))) {
-            // ERC1155
-            IERC1155 erc1155Token = IERC1155(_tokenContract);
-            require(erc1155Token.balanceOf(msg.sender,_tokenId) != 0, "You are not the owner of this token");
-            require(erc1155Token.balanceOf(msg.sender,_tokenId) >= _amount, "You have insufficient amount of tokens");
-            IERC1155(_tokenContract).safeTransferFrom(msg.sender, address(this), _tokenId, _amount, "");
         } else {
             revert("Unsupported token type");
         }
@@ -194,12 +180,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver,ERC1155Holder
                 royalityFee = erc721Token.royaltyFee(_tokenId);
                 royaltyRecipient = erc721Token.royaltyRecipient(_tokenId);
                 IERC721(_tokenContract).safeTransferFrom(address(this),msg.sender, _tokenId);
-            } else if (keccak256(abi.encodePacked(listNfts.tokenType)) == keccak256(abi.encodePacked("erc1155"))) {
-                // ERC1155
-                IERC1155 erc1155Token = IERC1155(_tokenContract);
-                royalityFee = erc1155Token.royaltyFee(_tokenId);
-                royaltyRecipient = erc1155Token.royaltyRecipient(_tokenId);
-                IERC1155(_tokenContract).safeTransferFrom(address(this),msg.sender, _tokenId, listNfts.tokenAmount, "");
             }
 
             uint256 royaltyAmount = totalPrice.mul(royalityFee).div(100); // Calculate royalty amount
@@ -219,15 +199,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver,ERC1155Holder
                 founderRecipient = erc721Token.founderRecipient(_tokenId);
                 plateformRecipient = erc721Token.plateformRecipient(_tokenId);
                 IERC721(_tokenContract).safeTransferFrom(address(this),msg.sender, _tokenId);
-            } else if (keccak256(abi.encodePacked(listNfts.tokenType)) == keccak256(abi.encodePacked("erc1155"))) {
-                // ERC1155
-                IERC1155 erc1155Token = IERC1155(_tokenContract);
-                royalityFee = erc1155Token.royaltyFee(_tokenId);
-                royaltyRecipient = erc1155Token.royaltyRecipient(_tokenId);
-                founderRecipient = erc1155Token.founderRecipient(_tokenId);
-                plateformRecipient = erc1155Token.plateformRecipient(_tokenId);
-
-                IERC1155(_tokenContract).safeTransferFrom(address(this),msg.sender, _tokenId, listNfts.tokenAmount, "");
             }
 
             uint256 royaltyAmount = totalPrice.mul(royalityFee).div(100); // Calculate royalty amount
@@ -269,9 +240,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver,ERC1155Holder
         if (keccak256(abi.encodePacked(listNfts.tokenType)) == keccak256(abi.encodePacked("erc721"))) {
             // ERC721
             IERC721(_tokenContract).safeTransferFrom(address(this),listNfts.owner, _tokenId);
-        } else if (keccak256(abi.encodePacked(listNfts.tokenType)) == keccak256(abi.encodePacked("erc1155"))) {
-            // ERC1155
-            IERC1155(_tokenContract).safeTransferFrom(address(this),listNfts.owner,_tokenId, listNfts.tokenAmount, "");
         }
 
         delete listNft[_tokenContract][_tokenId][owner];
@@ -310,12 +278,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver,ERC1155Holder
             IERC721 erc721Token = IERC721(_tokenContract);
             require(erc721Token.ownerOf(_tokenId) == msg.sender, "You are not the owner of this token");
             IERC721(_tokenContract).safeTransferFrom(msg.sender, address(this), _tokenId);
-        } else if (keccak256(abi.encodePacked(_type)) == keccak256(abi.encodePacked("erc1155"))) {
-            // ERC1155
-            IERC1155 erc1155Token = IERC1155(_tokenContract);
-            require(erc1155Token.balanceOf(msg.sender,_tokenId) != 0, "You are not the owner of this token");
-            require(erc1155Token.balanceOf(msg.sender,_tokenId) >= _amount, "You have insufficient amount of tokens");
-            IERC1155(_tokenContract).safeTransferFrom(msg.sender, address(this), _tokenId, _amount, "");
         } else {
             revert("Unsupported token type");
         }
@@ -355,12 +317,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver,ERC1155Holder
             IERC721 erc721Token = IERC721(_tokenContract);
             require(erc721Token.ownerOf(_tokenId) == msg.sender, "You are not the owner of this token");
             IERC721(_tokenContract).safeTransferFrom(msg.sender, address(this), _tokenId);
-        } else if (keccak256(abi.encodePacked(_type)) == keccak256(abi.encodePacked("erc1155"))) {
-            // ERC1155
-            IERC1155 erc1155Token = IERC1155(_tokenContract);
-            require(erc1155Token.balanceOf(msg.sender,_tokenId) != 0, "You are not the owner of this token");
-            require(erc1155Token.balanceOf(msg.sender,_tokenId) >= _amount, "You have insufficient amount of tokens");
-            IERC1155(_tokenContract).safeTransferFrom(msg.sender, address(this), _tokenId, _amount, "");
         } else {
             revert("Unsupported token type");
         }
@@ -450,12 +406,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver,ERC1155Holder
                 royalityFee = erc721Token.royaltyFee(_tokenId);
                 royaltyRecipient = erc721Token.royaltyRecipient(_tokenId);
                 IERC721(_tokenContract).safeTransferFrom(address(this), winner, _tokenId);
-            } else if (keccak256(abi.encodePacked(auction.tokenType)) == keccak256(abi.encodePacked("erc1155"))) {
-                // ERC1155
-                IERC1155 erc1155Token = IERC1155(_tokenContract);
-                royalityFee = erc1155Token.royaltyFee(_tokenId);
-                royaltyRecipient = erc1155Token.royaltyRecipient(_tokenId);
-                IERC1155(_tokenContract).safeTransferFrom(address(this), winner,_tokenId,auction.tokenAmount, "");
             } else {
                 revert("Unsupported token type");
             }
@@ -480,14 +430,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver,ERC1155Holder
                 founderRecipient = erc721Token.founderRecipient(_tokenId);
                 plateformRecipient = erc721Token.plateformRecipient(_tokenId);
                 IERC721(_tokenContract).safeTransferFrom(address(this), winner, _tokenId);
-            } else if (keccak256(abi.encodePacked(auction.tokenType)) == keccak256(abi.encodePacked("erc1155"))) {
-                // ERC1155
-                IERC1155 erc1155Token = IERC1155(_tokenContract);
-                royalityFee = erc1155Token.royaltyFee(_tokenId);
-                royaltyRecipient = erc1155Token.royaltyRecipient(_tokenId);
-                founderRecipient = erc1155Token.founderRecipient(_tokenId);
-                plateformRecipient = erc1155Token.plateformRecipient(_tokenId);
-                IERC1155(_tokenContract).safeTransferFrom(address(this), winner,_tokenId,auction.tokenAmount, "");
             } else {
                 revert("Unsupported token type");
             }

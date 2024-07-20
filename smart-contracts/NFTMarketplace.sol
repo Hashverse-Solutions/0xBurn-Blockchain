@@ -20,10 +20,15 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
 
     struct Bid {address bidder;uint256 amount;}
 
-    struct MarketItem {address tokenContract;address owner;string  tokenType;uint256 tokenId;uint256 tokenAmount;uint256 price;bool listNFT;bool ownerListNFT;}
+    struct MarketItem {address tokenContract;address owner;string  tokenType;uint256 tokenId;uint256 tokenAmount;uint256 price;bool listNFT; bool ownerListNFT;}
 
     uint256 public marketFeePercentage; // e.g., 100 means 1%
-    uint256 private marketplaceBalance;
+
+    address public teamAddress;
+    address public DAOTreasury;
+    address public RewardPool;
+    address[] public PartnerNFTholders;
+
 
     mapping(address => mapping(uint256 =>  mapping(address => Auction))) public auctions;
     mapping(address => mapping(uint256 => mapping(address => Bid))) public highestBids;
@@ -36,15 +41,23 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
 
     event MarketItemCreated(address indexed nftContract,uint256 indexed tokenId,address seller,uint256 price,bool indexed sold,bool isMarketItem);
 
-    /**
-     * @dev initializes the marketplace token address the contract.
-     * @param _marketplaceToken The address of the marketplace token.
-     */
 
-    constructor(address _marketplaceToken) Ownable(msg.sender) {
+    constructor(address _marketplaceToken,address _RewardPool, address _teamAddress, address _DAOTreasury, address[] memory _PartnerNFTholders) Ownable(msg.sender) {
         marketplaceToken = _marketplaceToken;
+        teamAddress = _teamAddress;
+        DAOTreasury = _DAOTreasury;
+        PartnerNFTholders = _PartnerNFTholders;
+        RewardPool = _RewardPool;
     }
 
+
+    function transferHolders(uint256 amount) public {
+        uint individualAmount = amount.div(PartnerNFTholders.length);
+
+        for (uint i = 0; i < PartnerNFTholders.length; i++) {
+            payable(PartnerNFTholders[i]).transfer(individualAmount);
+        }
+    }
     /**
      * @dev ERC721Receiver callback function to signal acceptance of an ERC721 token.
     */
@@ -64,7 +77,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
      * @param _tokenContract Address of the token contract.
      * @param _tokenId ID of the token being listed.
      * @param _price Price of the token.
-     * @param _amount Amount of ERC1155 tokens to list (for ERC1155 tokens).
      * @param _type Type of token ("erc721" or "erc1155").
      * @param owner Owner of the token.
     */
@@ -73,11 +85,9 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
          address _tokenContract,
         uint256 _tokenId,
         uint256 _price,
-        uint256 _amount,
         string memory _type,
         address owner
     ) external {
-        if(keccak256(abi.encodePacked(_type)) == keccak256(abi.encodePacked("erc1155"))) require(_amount > 0, "Amount should be greater than zero");
         require(!auctions[_tokenContract][_tokenId][owner].setAuction, "Already set auction");
         require(!listNft[_tokenContract][_tokenId][owner].listNFT,"Nft already list for sell");
 
@@ -95,7 +105,7 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
             owner: msg.sender,
             tokenType: _type,
             tokenId: _tokenId,
-            tokenAmount: _amount,
+            tokenAmount: 0,
             price: _price,
             listNFT: true,
             ownerListNFT: false
@@ -110,7 +120,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
      * @param _tokenContract Address of the token contract.
      * @param _tokenId ID of the token being listed.
      * @param _price Price of the token.
-     * @param _amount Amount of ERC1155 tokens to list (for ERC1155 tokens).
      * @param _type Type of token ("erc721" or "erc1155").
      * @param owner Owner of the token.
     */
@@ -119,11 +128,9 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
         address _tokenContract,
         uint256 _tokenId,
         uint256 _price,
-        uint256 _amount,
         string memory _type,
         address owner
     ) external {
-        if(keccak256(abi.encodePacked(_type)) == keccak256(abi.encodePacked("erc1155"))) require(_amount > 0, "Amount should be greater than zero");
         require(!auctions[_tokenContract][_tokenId][owner].setAuction, "Already set auction");
         require(!listNft[_tokenContract][_tokenId][owner].listNFT,"Nft already list for sell");
 
@@ -141,7 +148,7 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
             owner: msg.sender,
             tokenType: _type,
             tokenId: _tokenId,
-            tokenAmount: _amount,
+            tokenAmount: 0,
             price: _price,
             listNFT: true,
             ownerListNFT: true
@@ -168,52 +175,41 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
         require(listNft[_tokenContract][_tokenId][owner].listNFT,"Nft not list for sell");
         require(msg.value >= listNft[_tokenContract][_tokenId][owner].price,"Insufficient balance");
         uint256 totalPrice = listNfts.price;
-        uint256 royalityFee = 0;
-        address royaltyRecipient;
-        address plateformRecipient;
-        address founderRecipient;
-        
+
         if(!listNfts.ownerListNFT){
-            if (keccak256(abi.encodePacked(listNfts.tokenType)) == keccak256(abi.encodePacked("erc721"))) {
-                // ERC721
-                IERC721 erc721Token = IERC721(_tokenContract);
-                royalityFee = erc721Token.royaltyFee(_tokenId);
-                royaltyRecipient = erc721Token.royaltyRecipient(_tokenId);
-                IERC721(_tokenContract).safeTransferFrom(address(this),msg.sender, _tokenId);
-            }
-
-            uint256 royaltyAmount = totalPrice.mul(royalityFee).div(100); // Calculate royalty amount
-            uint256 sellerAmount = totalPrice.sub(royaltyAmount);
-            (bool royaltyTransferSuccess, ) = royaltyRecipient.call{value: royaltyAmount}("");
-            require(royaltyTransferSuccess, "Failed to send royalty");
-
-            (bool success, ) = listNfts.owner.call{value: sellerAmount}("");
+            (bool success, ) = listNfts.owner.call{value: totalPrice}("");
             require(success, "Payment to seller failed");
 
         }else{
-             if (keccak256(abi.encodePacked(listNfts.tokenType)) == keccak256(abi.encodePacked("erc721"))) {
-                // ERC721
-                IERC721 erc721Token = IERC721(_tokenContract);
-                royalityFee = erc721Token.royaltyFee(_tokenId);
-                royaltyRecipient = erc721Token.royaltyRecipient(_tokenId);
-                founderRecipient = erc721Token.founderRecipient(_tokenId);
-                plateformRecipient = erc721Token.plateformRecipient(_tokenId);
-                IERC721(_tokenContract).safeTransferFrom(address(this),msg.sender, _tokenId);
-            }
+            uint256 DAOTreasuryAmount = totalPrice.mul(20).div(100);
+            uint256 teamAmount = totalPrice.mul(20).div(100);
+            uint256 RewardPoolAmount = totalPrice.mul(20).div(100);
+            uint256 PartnerNFTAmount = totalPrice.mul(20).div(100);
 
-            uint256 royaltyAmount = totalPrice.mul(royalityFee).div(100); // Calculate royalty amount
-            uint256 plateformAmount = totalPrice.sub(royaltyAmount).div(2);
-            uint256 founderAmount = totalPrice.sub(royaltyAmount).sub(plateformAmount);
-            (bool royaltyTransferSuccess, ) = royaltyRecipient.call{value: royaltyAmount}("");
-            require(royaltyTransferSuccess, "Failed to send royalty");
+            uint256 totalPercet = DAOTreasuryAmount.add(teamAmount).add(RewardPoolAmount).add(DAOTreasuryAmount).add(PartnerNFTAmount);
+            uint256 founderAmount = totalPrice.sub(totalPercet);
 
-            (bool successPlateform, ) = plateformRecipient.call{value: plateformAmount}("");
-            require(successPlateform, "Payment to plateform failed");
 
-            (bool successFounder, ) = founderRecipient.call{value: founderAmount}("");
-            require(successFounder, "Payment to founder failed");
+            (bool royaltyTransferSuccess, ) = DAOTreasury.call{value: DAOTreasuryAmount }("");
+            require(royaltyTransferSuccess, "Failed to send DAOTreasury");
+
+            (bool successTeam, ) = teamAddress.call{value: teamAmount}("");
+            require(successTeam, "Payment to team failed");
+
+            (bool successRewards, ) = RewardPool.call{value: RewardPoolAmount}("");
+            require(successRewards, "Payment to RewardPool failed");
+
+            // (bool successPatners, ) = PartnerNFTholders.call{value: PartnerNFTAmount}("");
+            // require(successPatners, "Payment to PartnerNFTholders failed");
+
+            transferHolders(PartnerNFTAmount);
+
+            (bool successFounder, ) = listNfts.owner.call{value: founderAmount}("");
+            require(successFounder, "Payment to owner failed");
+
         }
 
+        IERC721(_tokenContract).safeTransferFrom(address(this),msg.sender,_tokenId);
         delete listNft[_tokenContract][_tokenId][owner];   
         emit MarketItemCreated( _tokenContract, _tokenId, msg.sender, totalPrice, true, false);
   
@@ -251,7 +247,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
      * @dev Creates an auction for an ERC721 or ERC1155 token.
      * @param _tokenContract Address of the token contract.
      * @param _tokenId ID of the token being listed for auction.
-     * @param _amount Amount of ERC1155 tokens to list (for ERC1155 tokens).
      * @param _startPrice Starting price of the auction.
      * @param _duration Duration of the auction.
      * @param _type Type of token ("erc721" or "erc1155").
@@ -261,7 +256,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
     function createAuction(
         address _tokenContract,
         uint256 _tokenId,
-        uint256 _amount,
         uint256 _startPrice,
         uint256 _duration,
         string memory _type,
@@ -271,7 +265,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
         require(_duration > 0, "Auction duration should be greater than zero");
         require(!auctions[_tokenContract][_tokenId][owner].setAuction, "Already set auction");
         require(!listNft[_tokenContract][_tokenId][owner].listNFT,"Nft already list for sell");
-        if(keccak256(abi.encodePacked(_type)) == keccak256(abi.encodePacked("erc1155"))) require(_amount > 0, "Amount should be greater than zero");
 
         if (keccak256(abi.encodePacked(_type)) == keccak256(abi.encodePacked("erc721"))) {
             // ERC721
@@ -287,7 +280,7 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
             tokenContract: _tokenContract,
             tokenType: _type,
             tokenId: _tokenId,
-            tokenAmount: _amount,
+            tokenAmount: 0,
             startPrice: _startPrice,
             duration: _duration,
             setAuction: true,
@@ -300,7 +293,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
     function createAuctionbyAdmin(
         address _tokenContract,
         uint256 _tokenId,
-        uint256 _amount,
         uint256 _startPrice,
         uint256 _duration,
         string memory _type,
@@ -310,8 +302,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
         require(_duration > 0, "Auction duration should be greater than zero");
         require(!auctions[_tokenContract][_tokenId][owner].setAuction, "Already set auction");
         require(!listNft[_tokenContract][_tokenId][owner].listNFT,"Nft already list for sell");
-        if(keccak256(abi.encodePacked(_type)) == keccak256(abi.encodePacked("erc1155"))) require(_amount > 0, "Amount should be greater than zero");
-
         if (keccak256(abi.encodePacked(_type)) == keccak256(abi.encodePacked("erc721"))) {
             // ERC721
             IERC721 erc721Token = IERC721(_tokenContract);
@@ -326,7 +316,7 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
             tokenContract: _tokenContract,
             tokenType: _type,
             tokenId: _tokenId,
-            tokenAmount: _amount,
+            tokenAmount: 0,
             startPrice: _startPrice,
             duration: _duration,
             setAuction: true,
@@ -373,6 +363,7 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
 
     function endAuction(address _tokenContract, uint256 _tokenId, address owner) external payable nonReentrant {
         Auction memory auction = auctions[_tokenContract][_tokenId][owner];
+        MarketItem storage listNfts = listNft[_tokenContract][_tokenId][owner];
         require(auction.duration > 0, "Auction does not exist");
         require(auction.tokenContract == _tokenContract, "Auction does not exist");
         require(block.timestamp >= auction.duration, "Auction has not ended yet");
@@ -382,9 +373,6 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
             if (keccak256(abi.encodePacked(auction.tokenType)) == keccak256(abi.encodePacked("erc721"))) {
                 // ERC721
                 IERC721(_tokenContract).safeTransferFrom(address(this), auction.seller, _tokenId);
-            } else if (keccak256(abi.encodePacked(auction.tokenType)) == keccak256(abi.encodePacked("erc1155"))) {
-                // ERC1155
-                IERC1155(_tokenContract).safeTransferFrom(address(this),auction.seller,_tokenId,auction.tokenAmount, "");
             } else {
                 revert("Unsupported token type");
             }
@@ -393,60 +381,39 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
         uint256 totalPrice = highestBids[_tokenContract][_tokenId][owner].amount;
         auctions[_tokenContract][_tokenId][owner].duration = 0;
 
-        uint256 royalityFee = 0;
-        address royaltyRecipient;
-        address plateformRecipient;
-        address founderRecipient;
-
         if(!auction.ownerListNFT){
-              // Transfer NFT to the winner
-            if (keccak256(abi.encodePacked(auction.tokenType)) == keccak256(abi.encodePacked("erc721"))) {
-                // ERC721
-                IERC721 erc721Token = IERC721(_tokenContract);
-                royalityFee = erc721Token.royaltyFee(_tokenId);
-                royaltyRecipient = erc721Token.royaltyRecipient(_tokenId);
-                IERC721(_tokenContract).safeTransferFrom(address(this), winner, _tokenId);
-            } else {
-                revert("Unsupported token type");
-            }
 
-            uint256 royaltyAmount = totalPrice.mul(royalityFee).div(100); // Calculate royalty amount
-            uint256 sellerAmount = totalPrice.sub(royaltyAmount);
-
-            if (royaltyRecipient != address(0) && royaltyAmount > 0) {
-                (bool royaltyTransferSuccess, ) = royaltyRecipient.call{value: royaltyAmount}("");
-                require(royaltyTransferSuccess, "Failed to send royalty");
-            }
-
-            (bool success, ) = auction.seller.call{value: sellerAmount}("");
+            (bool success, ) = auction.seller.call{value: totalPrice}("");
             require(success, "Payment to seller failed");
         }else{
-            // Transfer NFT to the winner
-            if (keccak256(abi.encodePacked(auction.tokenType)) == keccak256(abi.encodePacked("erc721"))) {
-                // ERC721
-                IERC721 erc721Token = IERC721(_tokenContract);
-                royalityFee = erc721Token.royaltyFee(_tokenId);
-                royaltyRecipient = erc721Token.royaltyRecipient(_tokenId);
-                founderRecipient = erc721Token.founderRecipient(_tokenId);
-                plateformRecipient = erc721Token.plateformRecipient(_tokenId);
-                IERC721(_tokenContract).safeTransferFrom(address(this), winner, _tokenId);
-            } else {
-                revert("Unsupported token type");
-            }
 
-            uint256 royaltyAmount = totalPrice.mul(royalityFee).div(100); // Calculate royalty amount
-            uint256 plateformAmount = totalPrice.sub(royaltyAmount).div(2);
-            uint256 founderAmount = totalPrice.sub(royaltyAmount).sub(plateformAmount);
-            (bool royaltyTransferSuccess, ) = royaltyRecipient.call{value: royaltyAmount}("");
-            require(royaltyTransferSuccess, "Failed to send royalty");
+            uint256 DAOTreasuryAmount = totalPrice.mul(20).div(100);
+            uint256 teamAmount = totalPrice.mul(20).div(100);
+            uint256 RewardPoolAmount = totalPrice.mul(20).div(100);
+            uint256 PartnerNFTAmount = totalPrice.mul(20).div(100);
 
-            (bool successPlateform, ) = plateformRecipient.call{value: plateformAmount}("");
-            require(successPlateform, "Payment to plateform failed");
+            uint256 totalPercet = DAOTreasuryAmount.add(teamAmount).add(RewardPoolAmount).add(DAOTreasuryAmount).add(PartnerNFTAmount);
+            uint256 founderAmount = totalPrice.sub(totalPercet);
 
-            (bool successFounder, ) = founderRecipient.call{value: founderAmount}("");
-            require(successFounder, "Payment to founder failed");
+            (bool royaltyTransferSuccess, ) = DAOTreasury.call{value: DAOTreasuryAmount }("");
+            require(royaltyTransferSuccess, "Failed to send DAOTreasury");
+
+            (bool successTeam, ) = teamAddress.call{value: teamAmount}("");
+            require(successTeam, "Payment to team failed");
+
+            (bool successRewards, ) = RewardPool.call{value: RewardPoolAmount}("");
+            require(successRewards, "Payment to RewardPool failed");
+
+            // (bool successPatners, ) = PartnerNFTholders.call{value: PartnerNFTAmount}("");
+            // require(successPatners, "Payment to PartnerNFTholders failed");
+
+            transferHolders(PartnerNFTAmount);
+
+            (bool successFounder, ) = listNfts.owner.call{value: founderAmount}("");
+            require(successFounder, "Payment to owner failed");
         }
 
+        IERC721(_tokenContract).safeTransferFrom(address(this), winner, _tokenId);
         delete auctions[_tokenContract][_tokenId][owner];
         delete highestBids[_tokenContract][_tokenId][owner];
         emit AuctionEnded(auction.seller, _tokenContract, _tokenId, winner, totalPrice);

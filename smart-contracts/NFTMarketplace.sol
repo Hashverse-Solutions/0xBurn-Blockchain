@@ -51,12 +51,14 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
     }
 
 
-    function transferHolders(uint256 amount) public {
+    function transferHolders(uint256 amount) internal  returns(bool) {
         uint individualAmount = amount.div(PartnerNFTholders.length);
 
         for (uint i = 0; i < PartnerNFTholders.length; i++) {
             payable(PartnerNFTholders[i]).transfer(individualAmount);
         }
+
+        return true;
     }
     /**
      * @dev ERC721Receiver callback function to signal acceptance of an ERC721 token.

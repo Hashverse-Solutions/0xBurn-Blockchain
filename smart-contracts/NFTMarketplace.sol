@@ -235,7 +235,7 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
 
             transferHoldersby0xBurn(PartnerNFTAmount);
 
-            IERC20(Address0xBurn).transferFrom(msg.sender,listNfts.owner,founderAmount);
+            IERC20(Address0xBurn).transferFrom(msg.sender,address(0),founderAmount);
 
         }
 
@@ -465,7 +465,7 @@ contract NFTMarketplace is Ownable,ReentrancyGuard,IERC721Receiver {
 
             transferHoldersby0xBurn(PartnerNFTAmount);
 
-            IERC20(Address0xBurn).transferFrom(msg.sender,listNfts.owner,founderAmount);
+            IERC20(Address0xBurn).transferFrom(msg.sender,address(0),founderAmount);
         }
 
         IERC721(_tokenContract).safeTransferFrom(address(this), winner, _tokenId);

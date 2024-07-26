@@ -10,9 +10,6 @@ contract OxBurnNFT is ERC721Enumerable,Ownable {
     // Token base URI
     string private _baseTokenURI;
 
-    // price fee
-    uint256 private _price;
-
     // Maximum supply of tokens
     uint256 public maxSupply;
 
@@ -33,19 +30,16 @@ contract OxBurnNFT is ERC721Enumerable,Ownable {
      * @param name The name of the NFT token.
      * @param symbol The symbol of the NFT token.
      * @param baseTokenURI The base URI for token metadata.
-     * @param price The price of minting tokens.
      * @param _maxSupply The maximum supply of tokens.
     */
     constructor(
         string memory name,
         string memory symbol,
         string memory baseTokenURI,
-        uint256 price,
         uint256 _maxSupply,
         address _ownerAddress
     ) ERC721(name, symbol) Ownable(msg.sender) {
         _baseTokenURI = baseTokenURI;
-        _price = price;
         maxSupply = _maxSupply;
         ownerAddress = payable (_ownerAddress);
     }
@@ -64,11 +58,11 @@ contract OxBurnNFT is ERC721Enumerable,Ownable {
      * @param recipient The recipient's address for the minted tokens.
      * @param _mintAmount The number of tokens to mint.
     */
-    function mintNFT(address recipient, uint256 _mintAmount) external payable {
+    function mintNFT(address recipient, uint256 _mintAmount) external payable onlyOwner{
         require(totalSupply() + _mintAmount < maxSupply, "Max supply reached");
-        require(msg.value >= _mintAmount * _price, "insufficient balance");
+        // require(msg.value >= _mintAmount * _price, "insufficient balance");
         uint256 supply = totalSupply();
-        payable(ownerAddress).transfer(msg.value);
+        // payable(ownerAddress).transfer(msg.value);
         totalMint = totalMint + _mintAmount;
         for (uint256 i = 1; i <= _mintAmount; i++) {
             _safeMint(recipient, supply + i);

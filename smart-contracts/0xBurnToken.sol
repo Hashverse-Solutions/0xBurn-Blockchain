@@ -683,4 +683,15 @@ contract OxBurnToken is Context, ERC20, MinterRole {
         _mint(_account, _amount);
         emit Mint(_account, _amount);
     }
+
+    /// @notice This is a public burnOxBurnToken function, this function burns OxBurn token
+    /// @param _account This parameter indicates address which requires to burn tokens
+    /// @param _amount This parameter indicates amount of tokens needed to be burned
+    function burnOxBurnToken(
+        address _account,
+        uint256 _amount
+    ) public {
+        require(balanceOf(_account) >= _amount, "OxBurnToken: Burn Amount exceeds account balance");
+        _burn(_account, _amount);
+    }
 }

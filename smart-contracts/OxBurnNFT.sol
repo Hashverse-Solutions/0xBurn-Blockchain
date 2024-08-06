@@ -62,6 +62,7 @@ contract OxBurnNFT is ERC721Enumerable,Ownable {
     function mintNFT(address recipient, uint256 _mintAmount) external payable {
         require(totalSupply() + _mintAmount < maxSupply, "Max supply reached");
         require(msg.value >= _mintAmount * _price, "insufficient balance");
+        require(walletOfOwner(msg.sender).length < 6, "max limit reached");
         uint256 supply = totalSupply();
         payable(owner()).transfer(msg.value);
         totalMint = totalMint + _mintAmount;

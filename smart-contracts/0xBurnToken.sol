@@ -4,45 +4,6 @@
 
 pragma solidity 0.8.19;
 
-// File: contracts/roles/Roles.sol
-/**
- * @title Roles
- * @dev Library for managing addresses assigned to a Role.
- */
-library Roles {
-    struct Role {
-        mapping(address => bool) bearer;
-    }
-
-    /**
-     * @dev Give an account access to this role.
-     */
-    function add(Role storage role, address account) internal {
-        require(!has(role, account), "Roles: account already has role");
-        role.bearer[account] = true;
-    }
-
-    /**
-     * @dev Remove an account's access to this role.
-     */
-    function remove(Role storage role, address account) internal {
-        require(has(role, account), "Roles: account does not have role");
-        role.bearer[account] = false;
-    }
-
-    /**
-     * @dev Check if an account has this role.
-     * @return bool
-     */
-    function has(
-        Role storage role,
-        address account
-    ) internal view returns (bool) {
-        require(account != address(0), "Roles: account is the zero address");
-        return role.bearer[account];
-    }
-}
-
 // File: @openzeppelin/contracts/utils/Context.sol
 // OpenZeppelin Contracts v4.4.1 (utils/Context.sol)
 /**
@@ -65,47 +26,74 @@ abstract contract Context {
     }
 }
 
-// File: contracts/roles/MinterRole.sol
-abstract contract MinterRole is Context {
-    using Roles for Roles.Role;
+// File: @openzeppelin/contracts/access/Ownable.sol
+/**
+ * @dev Contract module which provides a basic access control mechanism, where
+ * there is an account (an owner) that can be granted exclusive access to
+ * spe0xBurnc functions.
+ *
+ * By default, the owner account will be the one that deploys the contract. This
+ * can later be changed with {transferOwnership}.
+ *
+ * This module is used through inheritance. It will make available the modifier
+ * `onlyOwner`, which can be applied to your functions to restrict their use to
+ * the owner.
+ */
+abstract contract Ownable is Context {
+    address private _owner;
 
-    event MinterAdded(address indexed account);
-    event MinterRemoved(address indexed account);
+    event OwnershipTransferred(
+        address indexed previousOwner,
+        address indexed newOwner
+    );
 
-    Roles.Role private _minters;
-
+    /**
+     * @dev Initializes the contract setting the deployer as the initial owner.
+     */
     constructor() {
-        _addMinter(_msgSender());
+        address msgSender = _msgSender();
+        _owner = msgSender;
+        emit OwnershipTransferred(address(0), msgSender);
     }
 
-    modifier onlyMinter() {
-        require(
-            isMinter(_msgSender()),
-            "MinterRole: caller does not have the Minter role"
-        );
+    /**
+     * @dev Returns the address of the current owner.
+     */
+    function owner() public view virtual returns (address) {
+        return _owner;
+    }
+
+    /**
+     * @dev Throws if called by any account other than the owner.
+     */
+    modifier onlyOwner() {
+        require(owner() == _msgSender(), "Ownable: caller is not the owner");
         _;
     }
 
-    function isMinter(address account) public view returns (bool) {
-        return _minters.has(account);
+    /**
+     * @dev Leaves the contract without owner. It will not be possible to call
+     * `onlyOwner` functions anymore. Can only be called by the current owner.
+     *
+     * NOTE: Renouncing ownership will leave the contract without an owner,
+     * thereby removing any functionality that is only available to the owner.
+     */
+    function renounceOwnership() public virtual onlyOwner {
+        emit OwnershipTransferred(_owner, address(0));
+        _owner = address(0);
     }
 
-    function addMinter(address account) public onlyMinter {
-        _addMinter(account);
-    }
-
-    function renounceMinter() public {
-        _removeMinter(_msgSender());
-    }
-
-    function _addMinter(address account) internal {
-        _minters.add(account);
-        emit MinterAdded(account);
-    }
-
-    function _removeMinter(address account) internal {
-        _minters.remove(account);
-        emit MinterRemoved(account);
+    /**
+     * @dev Transfers ownership of the contract to a new account (`newOwner`).
+     * Can only be called by the current owner.
+     */
+    function transferOwnership(address newOwner) public virtual onlyOwner {
+        require(
+            newOwner != address(0),
+            "Ownable: new owner is the zero address"
+        );
+        emit OwnershipTransferred(_owner, newOwner);
+        _owner = newOwner;
     }
 }
 
@@ -656,7 +644,7 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IERC20-approve}.
  */
-contract OxBurnToken is Context, ERC20, MinterRole {
+contract OxBurnToken is Context, ERC20, Ownable {
     uint256 public tokenSupply;
     event Mint(address, uint);
 
@@ -665,6 +653,10 @@ contract OxBurnToken is Context, ERC20, MinterRole {
         string memory _symbol,
         uint256 _tokenSupply
     ) ERC20(_name, _symbol) {
+        require(
+            _tokenSupply > 0,
+            "OxBurnToken: Token supply should be greater than 0"
+        );
         tokenSupply = _tokenSupply;
     }
 
@@ -674,7 +666,15 @@ contract OxBurnToken is Context, ERC20, MinterRole {
     function mintOxBurnToken(
         address _account,
         uint256 _amount
-    ) public onlyMinter {
+    ) public onlyOwner {
+        require(
+            _account != address(0),
+            "OxBurnToken: Mint address should not be 0"
+        );
+        require(
+            _amount > 0,
+            "OxBurnToken: Mint Amount should be greater than 0"
+        );
         uint256 supply = totalSupply();
         require(
             supply + _amount <= tokenSupply,
@@ -687,11 +687,19 @@ contract OxBurnToken is Context, ERC20, MinterRole {
     /// @notice This is a public burnOxBurnToken function, this function burns OxBurn token
     /// @param _account This parameter indicates address which requires to burn tokens
     /// @param _amount This parameter indicates amount of tokens needed to be burned
-    function burnOxBurnToken(
-        address _account,
-        uint256 _amount
-    ) public {
-        require(balanceOf(_account) >= _amount, "OxBurnToken: Burn Amount exceeds account balance");
+    function burnOxBurnToken(address _account, uint256 _amount) public {
+        require(
+            _account != address(0),
+            "OxBurnToken: Burn address should not be 0"
+        );
+        require(
+            _amount > 0,
+            "OxBurnToken: Burn Amount should be greater than 0"
+        );
+        require(
+            balanceOf(_account) >= _amount,
+            "OxBurnToken: Burn Amount exceeds account balance"
+        );
         _burn(_account, _amount);
     }
 }

@@ -429,7 +429,6 @@ contract ZeroXDAO is Ownable {
     ) external HolderOnlyVoting activeProposalOnly(proposalIndex) {
         require(votingFee >= 1 ether, "ZeroXDAO: Invalid voting fee");
 
-        // IERC20(tokenAddress).transfer(address(0), votingFee);
         IERC20(tokenAddress).burnOxBurnToken(msg.sender, votingFee);
 
         Proposal storage proposal = proposals[proposalIndex];
@@ -491,6 +490,39 @@ contract ZeroXDAO is Ownable {
         }
     }
 
+    function getPassPercentage(
+        uint256 proposalIndex
+    ) public view returns (uint256) {
+        Proposal storage proposal = proposals[proposalIndex];
+
+        uint256 teamYes = proposal.voteStruct.teamYes;
+        uint256 teamNo = proposal.voteStruct.teamNo;
+        uint256 partnerYes = proposal.voteStruct.partnerYes;
+        uint256 partnerNo = proposal.voteStruct.partnerNo;
+        uint256 communityYes = proposal.voteStruct.communityYes;
+        uint256 communityNo = proposal.voteStruct.communityNo;
+
+        uint256 teamImpact = ((teamYes + teamNo) == 0)
+            ? 0
+            : (teamYes * 20) / (teamYes + teamNo);
+        uint256 partnerImpact = ((partnerYes + partnerNo) == 0)
+            ? 0
+            : (partnerYes * 20) / (partnerYes + partnerNo);
+        uint256 communityImpact = ((communityYes + communityNo) == 0)
+            ? 0
+            : (communityYes * 60) / (communityYes + communityNo);
+
+        uint256 weightedYesVotes = 0;
+
+        if ((communityYes + communityNo) > 9) {
+            weightedYesVotes = teamImpact + partnerImpact + communityImpact;
+        } else {
+            weightedYesVotes = teamImpact + partnerImpact;
+        }
+
+        return weightedYesVotes;
+    }
+
     /// @dev executeProposal allows any CryptoDevsNFT holder to execute a proposal after it's deadline has been exceeded
     /// @param proposalIndex - the index of the proposal to execute in the proposals array
     /// @param _execute - string to match the reult of proposal
@@ -500,49 +532,38 @@ contract ZeroXDAO is Ownable {
     ) external HolderOnlyProposal inactiveProposalOnly(proposalIndex) {
         Proposal storage proposal = proposals[proposalIndex];
 
-        uint256 teamYesCount = proposal.voteStruct.teamYes;
-        uint256 partnerYesCount = proposal.voteStruct.partnerYes;
-        uint256 communityYesCount = proposal.voteStruct.communityYes;
-        uint256 teamNoCount = proposal.voteStruct.teamNo;
-        uint256 partnerNoCount = proposal.voteStruct.partnerNo;
-        uint256 communityNoCount = proposal.voteStruct.communityNo;
+        uint256 teamYes = proposal.voteStruct.teamYes;
+        uint256 teamNo = proposal.voteStruct.teamNo;
+        uint256 partnerYes = proposal.voteStruct.partnerYes;
+        uint256 partnerNo = proposal.voteStruct.partnerNo;
+        uint256 communityYes = proposal.voteStruct.communityYes;
+        uint256 communityNo = proposal.voteStruct.communityNo;
+
+        uint256 teamImpact = ((teamYes + teamNo) == 0)
+            ? 0
+            : (teamYes * 20) / (teamYes + teamNo);
+        uint256 partnerImpact = ((partnerYes + partnerNo) == 0)
+            ? 0
+            : (partnerYes * 20) / (partnerYes + partnerNo);
+        uint256 communityImpact = ((communityYes + communityNo) == 0)
+            ? 0
+            : (communityYes * 60) / (communityYes + communityNo);
+
         uint256 weightedYesVotes = 0;
-        uint256 weightedNoVotes = 0;
 
-        if (communityYesCount + communityNoCount > 9) {
-            // Calculate the weighted yes votes
-            weightedYesVotes =
-                (teamYesCount * 20) +
-                (partnerYesCount * 20) +
-                (communityYesCount * 60);
-            // Calculate the weighted no votes
-            weightedNoVotes =
-                (teamNoCount * 20) +
-                (partnerNoCount * 20) +
-                (communityNoCount * 60);
+        if ((communityYes + communityNo) > 9) {
+            weightedYesVotes = teamImpact + partnerImpact + communityImpact;
         } else {
-            // Calculate the weighted yes votes
-            weightedYesVotes = (teamYesCount * 20) + (partnerYesCount * 20);
-            // Calculate the weighted no votes
-            weightedNoVotes = (teamNoCount * 20) + (partnerNoCount * 20);
+            weightedYesVotes = teamImpact + partnerImpact;
         }
-
-        // Calculate the weighted total votes
-        uint256 totalWeightedVotes = weightedYesVotes + weightedNoVotes;
-
-        // Ensure the total weighted votes are non-zero to avoid division by zero
-        require(totalWeightedVotes > 0, "ZeroXDAO: No votes cast");
 
         // Determine the result based on the majority of weighted votes
         if (
             keccak256(abi.encodePacked(_execute)) ==
             keccak256(abi.encodePacked("PASS"))
         ) {
-            // Calculate the percentage of yes votes
-            uint256 yesVotePercentage = (weightedYesVotes * 100) /
-                totalWeightedVotes;
             // Pass if yes votes are greater than or equal to 50%
-            if (yesVotePercentage >= 50) {
+            if (weightedYesVotes >= 50) {
                 proposal.result = "PASS";
             } else {
                 proposal.result = "FAIL";
@@ -580,6 +601,10 @@ contract ZeroXDAO is Ownable {
     /// @dev addPartner checks if an address is a partner
     /// @param _address the address to be checked as a partner
     function addPartner(address _address) external {
+        require(
+            IERC721(nftAddress).balanceOf(_address) > 0,
+            "ZeroXDAO: Wallet does not have partner NFT"
+        );
         partners.push(Partner(_address));
     }
 }

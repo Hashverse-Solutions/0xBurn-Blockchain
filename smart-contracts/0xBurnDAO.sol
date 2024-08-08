@@ -262,6 +262,7 @@ interface IERC721 is IERC165 {
 }
 
 contract ZeroXDAO is Ownable {
+    
     // Create a struct named Proposal containing all relevant information
     struct Proposal {
         // proposal title
@@ -281,7 +282,7 @@ contract ZeroXDAO is Ownable {
         // result - whether this proposal has has passed or failed.
         string result;
         // voters - a mapping of address to booleans indicating whether that user has already cast a vote or not
-        mapping(address => bool) voters;
+        mapping(address => uint256) voters;
         //total vote count
         uint256 voteCount;
         // Votes Struct call
@@ -434,7 +435,7 @@ contract ZeroXDAO is Ownable {
         Proposal storage proposal = proposals[proposalIndex];
 
         require(
-            !proposal.voters[msg.sender],
+            proposal.voters[msg.sender] == 0,
             "ZeroXDAO: Already voted for this proposal"
         );
 
@@ -445,21 +446,21 @@ contract ZeroXDAO is Ownable {
             if (teamWallet == true) {
                 proposal.voteStruct.teamYes++;
                 proposal.yayVotes++;
-                proposal.voters[msg.sender] = _vote;
+                proposal.voters[msg.sender] = 1;
                 proposal.voteCount++;
                 emit Voted(proposalIndex, msg.sender);
                 return;
             } else if (partnerWallet == true) {
                 proposal.voteStruct.partnerYes++;
                 proposal.yayVotes++;
-                proposal.voters[msg.sender] = _vote;
+                proposal.voters[msg.sender] = 1;
                 proposal.voteCount++;
                 emit Voted(proposalIndex, msg.sender);
                 return;
             } else {
                 proposal.voteStruct.communityYes++;
                 proposal.yayVotes++;
-                proposal.voters[msg.sender] = _vote;
+                proposal.voters[msg.sender] = 1;
                 proposal.voteCount++;
                 emit Voted(proposalIndex, msg.sender);
                 return;
@@ -468,21 +469,21 @@ contract ZeroXDAO is Ownable {
             if (teamWallet == true) {
                 proposal.voteStruct.teamNo++;
                 proposal.nayVotes++;
-                proposal.voters[msg.sender] = _vote;
+                proposal.voters[msg.sender] = 1;
                 proposal.voteCount++;
                 emit Voted(proposalIndex, msg.sender);
                 return;
             } else if (partnerWallet == true) {
                 proposal.voteStruct.partnerNo++;
                 proposal.nayVotes++;
-                proposal.voters[msg.sender] = _vote;
+                proposal.voters[msg.sender] = 1;
                 proposal.voteCount++;
                 emit Voted(proposalIndex, msg.sender);
                 return;
             } else {
                 proposal.voteStruct.communityNo++;
                 proposal.nayVotes++;
-                proposal.voters[msg.sender] = _vote;
+                proposal.voters[msg.sender] = 1;
                 proposal.voteCount++;
                 emit Voted(proposalIndex, msg.sender);
                 return;
@@ -490,9 +491,7 @@ contract ZeroXDAO is Ownable {
         }
     }
 
-    function getPassPercentage(
-        uint256 proposalIndex
-    ) public view returns (uint256) {
+    function getPassPercentage(uint256 proposalIndex) public view returns (uint256) {
         Proposal storage proposal = proposals[proposalIndex];
 
         uint256 teamYes = proposal.voteStruct.teamYes;
@@ -502,25 +501,20 @@ contract ZeroXDAO is Ownable {
         uint256 communityYes = proposal.voteStruct.communityYes;
         uint256 communityNo = proposal.voteStruct.communityNo;
 
-        uint256 teamImpact = ((teamYes + teamNo) == 0)
-            ? 0
-            : (teamYes * 20) / (teamYes + teamNo);
-        uint256 partnerImpact = ((partnerYes + partnerNo) == 0)
-            ? 0
-            : (partnerYes * 20) / (partnerYes + partnerNo);
-        uint256 communityImpact = ((communityYes + communityNo) == 0)
-            ? 0
-            : (communityYes * 60) / (communityYes + communityNo);
-
+        uint256 teamImpact = ((teamYes + teamNo) == 0) ? 0 : (teamYes * 20) / (teamYes + teamNo);
+        uint256 partnerImpact = ((partnerYes + partnerNo) == 0) ? 0 : (partnerYes * 20) / (partnerYes + partnerNo);
+        uint256 communityImpact = ((communityYes + communityNo) == 0) ? 0 : (communityYes * 60) / (communityYes + communityNo);
+    
         uint256 weightedYesVotes = 0;
-
-        if ((communityYes + communityNo) > 9) {
+    
+        if((communityYes + communityNo) > 9){
             weightedYesVotes = teamImpact + partnerImpact + communityImpact;
         } else {
             weightedYesVotes = teamImpact + partnerImpact;
         }
 
         return weightedYesVotes;
+
     }
 
     /// @dev executeProposal allows any CryptoDevsNFT holder to execute a proposal after it's deadline has been exceeded
@@ -538,20 +532,14 @@ contract ZeroXDAO is Ownable {
         uint256 partnerNo = proposal.voteStruct.partnerNo;
         uint256 communityYes = proposal.voteStruct.communityYes;
         uint256 communityNo = proposal.voteStruct.communityNo;
-
-        uint256 teamImpact = ((teamYes + teamNo) == 0)
-            ? 0
-            : (teamYes * 20) / (teamYes + teamNo);
-        uint256 partnerImpact = ((partnerYes + partnerNo) == 0)
-            ? 0
-            : (partnerYes * 20) / (partnerYes + partnerNo);
-        uint256 communityImpact = ((communityYes + communityNo) == 0)
-            ? 0
-            : (communityYes * 60) / (communityYes + communityNo);
-
+    
+        uint256 teamImpact = ((teamYes + teamNo) == 0) ? 0 : (teamYes * 20) / (teamYes + teamNo);
+        uint256 partnerImpact = ((partnerYes + partnerNo) == 0) ? 0 : (partnerYes * 20) / (partnerYes + partnerNo);
+        uint256 communityImpact = ((communityYes + communityNo) == 0) ? 0 : (communityYes * 60) / (communityYes + communityNo);
+    
         uint256 weightedYesVotes = 0;
-
-        if ((communityYes + communityNo) > 9) {
+    
+        if((communityYes + communityNo) > 9){
             weightedYesVotes = teamImpact + partnerImpact + communityImpact;
         } else {
             weightedYesVotes = teamImpact + partnerImpact;
@@ -574,6 +562,16 @@ contract ZeroXDAO is Ownable {
 
         proposal.executed = true;
         emit Executed(proposalIndex, proposal.result);
+    }
+
+    /// @dev hasVoted checks if an address is a team
+    /// @param _address the address to be checked as a voter
+    function hasVoted(
+        uint256 proposalIndex,
+        address _address
+    ) public view returns (uint256) {
+        Proposal storage proposal = proposals[proposalIndex];
+        return proposal.voters[_address]; // Address is not found in teams
     }
 
     /// @dev isTeam checks if an address is a team
@@ -601,10 +599,7 @@ contract ZeroXDAO is Ownable {
     /// @dev addPartner checks if an address is a partner
     /// @param _address the address to be checked as a partner
     function addPartner(address _address) external {
-        require(
-            IERC721(nftAddress).balanceOf(_address) > 0,
-            "ZeroXDAO: Wallet does not have partner NFT"
-        );
+        require(IERC721(nftAddress).balanceOf(_address) > 0, "ZeroXDAO: Wallet does not have partner NFT");
         partners.push(Partner(_address));
     }
 }
